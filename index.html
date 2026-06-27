@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>付款审批单打印系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", Arial, sans-serif; background: #f5f7fa; min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%); color: white; padding: 20px 30px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3); }
+        .header h1 { font-size: 24px; }
+        .card { background: white; border-radius: 10px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .card-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #1890ff; display: flex; align-items: center; gap: 10px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+        .btn-primary { background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4); }
+        .btn-success { background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%); color: white; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(82, 196, 26, 0.4); }
+        .btn-warning { background: linear-gradient(135deg, #faad14 0%, #d48806 100%); color: white; }
+        .btn-warning:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(250, 173, 20, 0.4); }
+        .btn-large { padding: 15px 30px; font-size: 16px; }
+        .btn-outline { background: white; border: 2px solid #1890ff; color: #1890ff; }
+        .btn-outline:hover { background: #e6f7ff; }
+        .btn-danger { background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%); color: white; }
+        .action-area { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        .tip { background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 6px; padding: 12px 15px; margin-bottom: 15px; font-size: 14px; color: #0050b3; line-height: 1.6; }
+        .tip::before { content: "💡 "; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e8e8e8; }
+        th { background: #fafafa; font-weight: 600; color: #333; }
+        tr:hover { background: #e6f7ff; }
+        tr.selected { background: #bae7ff; }
+        .custom-checkbox { width: 20px; height: 20px; border: 2px solid #d9d9d9; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: white; transition: all 0.2s; vertical-align: middle; }
+        .custom-checkbox:hover { border-color: #1890ff; }
+        .custom-checkbox.checked { background: #1890ff; border-color: #1890ff; }
+        .custom-checkbox.checked::after { content: "✓"; color: white; font-size: 14px; font-weight: bold; }
+        .filter-bar { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .filter-bar input { padding: 10px 15px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; outline: none; width: 250px; }
+        .filter-bar input:focus { border-color: #1890ff; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 9999; justify-content: center; align-items: center; overflow-y: auto; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 10px; width: 90%; max-width: 900px; max-height: 95vh; overflow-y: auto; margin: 20px auto; }
+        .modal-header { padding: 20px; border-bottom: 1px solid #e8e8e8; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 1; }
+        .modal-header h3 { font-size: 18px; color: #333; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #e8e8e8; display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 0; background: white; }
+        .data-status { display: flex; align-items: center; gap: 10px; padding: 10px 15px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; color: #389e0d; }
+        .print-area { padding: 15px; background: #f5f5f5; }
+        .print-template { width: 210mm; height: 148mm; margin: 0 auto 20px auto; padding: 0; background: white; font-family: "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 11pt; color: #000; position: relative; overflow: hidden; page-break-after: always; -webkit-user-select: none; user-select: none; }
+        .print-template::selection, .print-template *::selection { background: transparent; color: inherit; }
+        .print-template:last-child { page-break-after: avoid; }
+        .print-title { position: absolute; top: 10mm; left: 0; right: 0; text-align: center; font-size: 16pt; font-weight: bold; letter-spacing: 6px; }
+        .print-header-row { position: absolute; top: 19mm; left: 10mm; right: 10mm; display: flex; justify-content: space-between; font-size: 11pt; }
+        .print-main-table { position: absolute; top: 25mm; left: 10mm; bottom: 20mm; border-collapse: collapse; table-layout: fixed; width: 183mm; }
+        .print-main-table th, .print-main-table td { border: 1px solid #000; padding: 0 2px; font-size: 10pt; vertical-align: middle; overflow: hidden; }
+        .print-main-table th { background: #ffffff; font-weight: normal; text-align: center; width: auto; font-family: "Microsoft YaHei", "微软雅黑", sans-serif; }
+        .print-main-table td { text-align: left; }
+        .auto-fit-cell { overflow: hidden; line-height: 1.1; }
+        .checkbox-group { display: flex; gap: 10px; padding: 2px; }
+        .checkbox-item { display: flex; align-items: center; gap: 3px; font-size: 11pt; }
+        .checkbox { width: 10px; height: 10px; border: 1px solid #000; display: inline-block; font-size: 8px; text-align: center; line-height: 10px; }
+        .checkbox.checked::after { content: "✓"; font-size: 14pt; }
+        .amount-grid { display: flex; height: 7mm; }
+        .amount-grid-cell { width: 5.55mm; height: 7mm; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; font-size: 11pt; font-weight: bold; }
+        .amount-grid-cell:last-child { border-right: none; }
+        .amount-label-grid { display: flex; height: 7mm; }
+        .amount-label-cell { width: 5.55mm; height: 7mm; border-right: 1px solid #000; border-bottom: 1px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: normal; color: #000; }
+        .amount-label-cell:last-child { border-right: none; }
+        .approval-row { display: flex; height: 22mm; }
+        .approval-cell { flex: 1; border: 1px solid #000; padding: 1px; }
+        .approval-cell .label { font-size: 11pt; color: #333; }
+        .print-footer-row { position: absolute; bottom: 12mm; left: 10mm; right: 10mm; display: flex; justify-content: space-between; font-size: 10pt; }
+        .print-root { display: none; }
+        .print-user-label { position: absolute; bottom: 12mm; left: 102mm; font-size: 10pt; }
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .login-box { background: white; border-radius: 15px; padding: 40px; width: 400px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); text-align: center; }
+        .login-box h2 { font-size: 22px; color: #333; margin-bottom: 8px; }
+        .login-box .subtitle { font-size: 13px; color: #999; margin-bottom: 25px; }
+        .login-box input { width: 100%; padding: 12px 15px; border: 2px solid #e8e8e8; border-radius: 8px; font-size: 16px; text-align: center; letter-spacing: 2px; outline: none; margin-bottom: 15px; transition: border-color 0.3s; }
+        .login-box input:focus { border-color: #667eea; }
+        .login-box .btn-login { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: transform 0.2s; }
+        .login-box .btn-login:hover { transform: translateY(-2px); }
+        .login-error { color: #f5222d; font-size: 13px; margin-top: 10px; display: none; }
+        .config-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 10001; align-items: center; justify-content: center; }
+        .config-overlay.active { display: flex; }
+        .config-box { background: white; border-radius: 15px; padding: 30px; width: 700px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+        .config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #1890ff; }
+        .config-header h3 { font-size: 18px; color: #333; }
+        .config-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .config-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .config-table th, .config-table td { border: 1px solid #e8e8e8; padding: 10px 12px; text-align: left; font-size: 14px; }
+        .config-table th { background: #fafafa; font-weight: 600; color: #333; }
+        .config-table input { width: 100%; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px; outline: none; }
+        .config-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .admin-pwd-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 10002; align-items: center; justify-content: center; }
+        .admin-pwd-overlay.active { display: flex; }
+        .admin-pwd-box { background: white; border-radius: 15px; padding: 30px; width: 350px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+        .admin-pwd-box h3 { margin-bottom: 20px; font-size: 18px; color: #333; }
+        .admin-pwd-box input { width: 100%; padding: 10px 12px; border: 2px solid #e8e8e8; border-radius: 8px; font-size: 16px; text-align: center; outline: none; margin-bottom: 15px; }
+        .admin-pwd-error { color: #f5222d; font-size: 13px; margin-bottom: 10px; display: none; }
+        .config-pwd-input { width: 200px; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; outline: none; margin-right: 10px; }
+        .login-config-link { margin-top: 15px; font-size: 12px; color: #999; cursor: pointer; }
+        .login-config-link:hover { color: #667eea; }
+        @media print {
+            @page { size: 210mm 148mm; margin: 0; }
+            * { background-color: transparent !important; background-image: none !important; box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body, p, div, span, td, th, .print-template, .print-template * { color: #000000 !important; }
+            .print-root, .print-root * { background-color: #ffffff !important; }
+            html, body { margin: 0; padding: 0; background: white; }
+            body > .container, body > .modal, body > *:not(.print-root) { display: none !important; }
+            .print-root { display: block !important; width: 210mm; margin: 0 auto; padding: 0; background: white; }
+            .print-root .print-template { width: 210mm; height: 148mm; margin: 0; padding: 0; border: none; box-shadow: none; page-break-after: always; page-break-inside: avoid; overflow: hidden; }
+            .print-root .print-template:last-child { page-break-after: avoid; }
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; gap: 10px; }
+            .filter-bar { flex-direction: column; }
+            .filter-bar input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>付款审批单打印系统</h2>
+            <div class="subtitle">请输入您的激活码登录使用</div>
+            <input type="text" id="loginCode" placeholder="请输入激活码" maxlength="30" onkeypress="if(event.key==='Enter')doLogin()">
+            <button class="btn-login" onclick="doLogin()">登 录</button>
+            <div class="login-error" id="loginError">激活码无效，请检查后重新输入</div>
+            <div class="login-config-link" onclick="showAdminPwdDialog()">管理员配置</div>
+        </div>
+    </div>
+
+    <div class="admin-pwd-overlay" id="adminPwdOverlay">
+        <div class="admin-pwd-box">
+            <h3>管理员验证</h3>
+            <input type="password" id="adminPwdInput" placeholder="请输入管理密码" onkeypress="if(event.key==='Enter')verifyAdminPwd()">
+            <div class="admin-pwd-error" id="adminPwdError">密码错误</div>
+            <button class="btn btn-primary" onclick="verifyAdminPwd()" style="width:100%">确 认</button>
+            <div style="margin-top:10px"><button class="btn" onclick="closeAdminPwd()" style="background:#f5f5f5;color:#666;width:100%">取 消</button></div>
+        </div>
+    </div>
+
+    <div class="config-overlay" id="configOverlay">
+        <div class="config-box">
+            <div class="config-header">
+                <h3>使用人配置</h3>
+                <button class="config-close" onclick="closeConfig()">&times;</button>
+            </div>
+            <table class="config-table">
+                <thead>
+                    <tr>
+                        <th style="width:60px">序号</th>
+                        <th style="width:150px">使用人</th>
+                        <th>激活码</th>
+                        <th style="width:80px">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="configTableBody"></tbody>
+            </table>
+            <div class="config-actions">
+                <button class="btn btn-primary" onclick="addConfigRow()">+ 添加1行</button>
+                <button class="btn btn-success" onclick="saveConfig()">保存配置</button>
+            </div>
+            <div style="margin-top:15px; padding-top:15px; border-top:1px solid #e8e8e8;">
+                <label style="font-size:13px; color:#666;">管理密码：</label>
+                <input type="text" class="config-pwd-input" id="configAdminPwd" placeholder="修改管理密码">
+                <button class="btn" onclick="saveAdminPwd()" style="background:#faad14;color:white">保存密码</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display:none">
+        <div class="header">
+            <h1>付款审批单打印系统</h1>
+            <div style="font-size: 14px; opacity: 0.9;">当前用户：<span id="currentUserDisplay"></span></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>📂</span> 数据加载</div>
+            <div class="tip">点击下方按钮从WPS多维表格加载数据，系统会自动筛选出您填报的记录。</div>
+            
+            <div class="action-area">
+                <button class="btn btn-primary btn-large" onclick="fetchDataFromWPS()" id="fetchBtn">
+                    <span>🔄</span> 从WPS多维表格加载数据
+                </button>
+                <button class="btn btn-success" onclick="loadDemoData()">
+                    <span>📋</span> 加载示例数据
+                </button>
+                <div id="dataStatus" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span>📊</span> 付款审批单列表</div>
+            <div class="tip">勾选多张单据后点击「批量打印」可连续打印（A5横向），或点击「A4打印」使用A4纸只打印上半部分</div>
+            <div class="filter-bar">
+                <input type="text" id="searchInput" placeholder="搜索单号、单位名称..." onkeyup="filterData()">
+                <input type="text" id="billNoFilter" placeholder="起始单号（如 FK-2025-010）" onkeyup="filterData()" style="width: 220px;">
+                <button class="btn btn-success" onclick="printSelected()">
+                    <span>🖨️</span> 批量打印 (<span id="selectedCountBtn">0</span>)
+                </button>
+                <button class="btn btn-warning" onclick="printSelectedA4()">
+                    <span>🖨️</span> A4打印
+                </button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">
+                                <div class="custom-checkbox" id="selectAll" onclick="toggleSelectAll()"></div>
+                            </th>
+                            <th>付款单位</th>
+                            <th>收款单位</th>
+                            <th>付款说明</th>
+                            <th>填报日期</th>
+                            <th>合同号</th>
+                            <th>付款日期</th>
+                            <th>付款方式</th>
+                            <th>收款银行</th>
+                            <th>收款账号</th>
+                            <th>备注</th>
+                            <th>金额</th>
+                            <th>出纳专用</th>
+                            <th>填报人</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="14" style="text-align: center; padding: 40px; color: #999;">
+                                请点击「从WPS多维表格加载数据」按钮
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="printModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>打印预览 (<span id="selectedCount">0</span> 张 · A5横向)</h3>
+                <button class="modal-close" onclick="closePrintModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: #666;">每张单据为A5横向(210mm×148mm)，点击下方按钮调用打印机</p>
+                <div class="print-area" id="printContainer">
+                    <div style="text-align: center; padding: 40px; color: #999;">请先勾选要打印的单据</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-warning" onclick="doPrint()">
+                    <span>🖨️</span> 调用打印机打印
+                </button>
+                <button class="btn" onclick="closePrintModal()" style="background: #f5f5f5; color: #666;">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="print-root" id="printRoot"></div>
+
+    <script>
+        var 报销数据 = [];
+        var 全量数据 = [];
+        var 选中的单号 = [];
+        var 当前使用者 = null;
+        var 当前打印模式 = 'a5';
+        var API_BASE = '';  // 部署后填入你的Vercel地址，如 https://your-app.vercel.app
+
+        if (typeof embeddedConfig === 'undefined') var embeddedConfig = null;
+        if (typeof embeddedAdminPwd === 'undefined') var embeddedAdminPwd = null;
+
+        function getConfigData() {
+            if (embeddedConfig) return embeddedConfig;
+            var data = localStorage.getItem('printSystem_config');
+            return data ? JSON.parse(data) : [];
+        }
+        function setConfigData(data) { localStorage.setItem('printSystem_config', JSON.stringify(data)); }
+        function getAdminPwd() {
+            if (embeddedAdminPwd) return embeddedAdminPwd;
+            return localStorage.getItem('printSystem_adminPwd') || 'admin888';
+        }
+        function setAdminPwd(pwd) { localStorage.setItem('printSystem_adminPwd', pwd); }
+
+        function verifyLoginCode(code) {
+            var config = getConfigData();
+            for (var i = 0; i < config.length; i++) {
+                if (config[i].code === code) return config[i];
+            }
+            return null;
+        }
+
+        function doLogin() {
+            var code = document.getElementById('loginCode').value.trim();
+            if (!code) {
+                document.getElementById('loginError').textContent = '请输入激活码';
+                document.getElementById('loginError').style.display = 'block';
+                return;
+            }
+            var user = verifyLoginCode(code);
+            if (user) {
+                当前使用者 = user;
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('mainContainer').style.display = 'block';
+                document.getElementById('loginError').style.display = 'none';
+                document.getElementById('currentUserDisplay').textContent = user.name;
+                if (API_BASE) fetchDataFromWPS();
+            } else {
+                document.getElementById('loginError').textContent = '激活码无效，请检查后重新输入';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        function showAdminPwdDialog() {
+            document.getElementById('adminPwdOverlay').classList.add('active');
+            document.getElementById('adminPwdInput').value = '';
+            document.getElementById('adminPwdError').style.display = 'none';
+            document.getElementById('adminPwdInput').focus();
+        }
+        function closeAdminPwd() { document.getElementById('adminPwdOverlay').classList.remove('active'); }
+        function verifyAdminPwd() {
+            var pwd = document.getElementById('adminPwdInput').value;
+            if (pwd === getAdminPwd()) { closeAdminPwd(); showConfig(); }
+            else {
+                document.getElementById('adminPwdError').textContent = '密码错误';
+                document.getElementById('adminPwdError').style.display = 'block';
+            }
+        }
+        function showConfig() {
+            var config = getConfigData();
+            renderConfigTable(config);
+            document.getElementById('configAdminPwd').value = '';
+            document.getElementById('configOverlay').classList.add('active');
+        }
+        function closeConfig() { document.getElementById('configOverlay').classList.remove('active'); }
+        function renderConfigTable(config) {
+            var tbody = document.getElementById('configTableBody');
+            var html = '';
+            for (var i = 0; i < config.length; i++) {
+                html += '<tr>';
+                html += '<td style="text-align:center">' + (i + 1) + '</td>';
+                html += '<td><input type="text" value="' + (config[i].name || '') + '" data-index="' + i + '" data-field="name"></td>';
+                html += '<td><input type="text" value="' + (config[i].code || '') + '" data-index="' + i + '" data-field="code"></td>';
+                html += '<td style="text-align:center"><button class="btn" onclick="deleteConfigRow(' + i + ')" style="padding:4px 10px;background:#ff4d4f;color:white;font-size:12px">删除</button></td>';
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+        function addConfigRow() {
+            var config = getConfigData();
+            config.push({ id: Date.now(), name: '', code: '' });
+            setConfigData(config);
+            renderConfigTable(config);
+        }
+        function deleteConfigRow(index) {
+            var config = getConfigData();
+            config.splice(index, 1);
+            setConfigData(config);
+            renderConfigTable(config);
+        }
+        function saveConfig() {
+            var inputs = document.querySelectorAll('#configTableBody input');
+            var config = getConfigData();
+            inputs.forEach(function(input) {
+                var idx = parseInt(input.getAttribute('data-index'));
+                var field = input.getAttribute('data-field');
+                if (config[idx]) config[idx][field] = input.value.trim();
+            });
+            setConfigData(config);
+            renderConfigTable(config);
+            alert('配置已保存！');
+        }
+        function saveAdminPwd() {
+            var newPwd = document.getElementById('configAdminPwd').value.trim();
+            if (!newPwd) { alert('请输入新的管理密码'); return; }
+            setAdminPwd(newPwd);
+            alert('管理密码已更新！');
+        }
+
+        var 系统字段 = [
+            { key: '报销单号', label: '报销单号' },
+            { key: '所属部门', label: '所属部门/付款单位' },
+            { key: '收款单位', label: '收款单位' },
+            { key: '付款说明', label: '费用类型' },
+            { key: '填报日期', label: '填报日期' },
+            { key: '合同号', label: '合同号' },
+            { key: '付款日期', label: '付款日期' },
+            { key: '付款方式', label: '付款方式' },
+            { key: '金额', label: '金额' },
+            { key: '收款银行', label: '收款银行' },
+            { key: '收款账号', label: '收款账号' },
+            { key: '备注', label: '备注' },
+            { key: '附件张数', label: '附件张数' },
+            { key: '出纳专用', label: '出纳专用' },
+            { key: '填报人', label: '填报人' }
+        ];
+
+        function fetchDataFromWPS() {
+            if (!API_BASE) {
+                alert('API地址未配置，请联系管理员设置API_BASE');
+                return;
+            }
+            var btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> 正在加载...';
+            showDataStatus('⏳ 正在从WPS多维表格加载数据...');
+
+            var url = API_BASE + '/api/wps-data?page_size=500';
+            if (当前使用者 && 当前使用者.name) {
+                url += '&filter=' + encodeURIComponent('填报人="' + 当前使用者.name + '"');
+            }
+
+            fetch(url)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        showDataStatus('❌ 加载失败：' + (data.detail ? JSON.stringify(data.detail) : data.error));
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>🔄</span> 从WPS多维表格加载数据';
+                        return;
+                    }
+                    var records = data.data && data.data.records ? data.data.records : [];
+                    全量数据 = records.map(function(record) {
+                        var fields = record.fields || record;
+                        return {
+                            '报销单号': fields['报销单号'] || fields['单号'] || '',
+                            '所属部门': fields['所属部门'] || fields['付款单位'] || '',
+                            '收款单位': fields['收款单位'] || '',
+                            '付款说明': fields['付款说明'] || fields['费用类型'] || '',
+                            '填报日期': formatDate(fields['填报日期'] || ''),
+                            '合同号': fields['合同号'] || '',
+                            '付款日期': formatDate(fields['付款日期'] || ''),
+                            '付款方式': fields['付款方式'] || '',
+                            '金额': parseFloat(fields['金额']) || 0,
+                            '收款银行': fields['收款银行'] || '',
+                            '收款账号': fields['收款账号'] || '',
+                            '备注': fields['备注'] || '',
+                            '附件张数': fields['附件张数'] || '',
+                            '出纳专用': fields['出纳专用'] || '',
+                            '填报人': typeof fields['填报人'] === 'object' ? (fields['填报人'].name || (fields['填报人'][0] && fields['填报人'][0].name) || '') : (fields['填报人'] || '')
+                        };
+                    });
+                    报销数据 = 当前使用者 ? 全量数据.filter(function(item) { return item['填报人'] === 当前使用者.name; }) : 全量数据.slice();
+                    if (报销数据.length === 0 && 当前使用者) 报销数据 = 全量数据.slice();
+                    updateTable();
+                    showDataStatus('✅ 成功加载 ' + 报销数据.length + ' 条记录');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>🔄</span> 从WPS多维表格加载数据';
+                })
+                .catch(function(err) {
+                    showDataStatus('❌ 网络错误：' + err.message);
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>🔄</span> 从WPS多维表格加载数据';
+                });
+        }
+
+        function formatDate(dateValue) {
+            if (!dateValue) return '';
+            if (typeof dateValue === 'number') {
+                var date = new Date((dateValue - 25569) * 86400 * 1000);
+                return date.toISOString().split('T')[0];
+            }
+            var date = new Date(dateValue);
+            if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+            return String(dateValue);
+        }
+
+        function showDataStatus(message) {
+            var statusDiv = document.getElementById('dataStatus');
+            statusDiv.style.display = 'flex';
+            statusDiv.className = 'data-status';
+            statusDiv.innerHTML = message;
+        }
+
+        function loadDemoData() {
+            全量数据 = [
+                { "报销单号": "FK-2025-001", "所属部门": "采购部", "收款单位": "上海XX供应商有限公司", "付款说明": "采购办公设备一批", "填报日期": "2025-01-15", "合同号": "HT-2025-001", "付款日期": "2025-01-15", "付款方式": "对公转账", "金额": 15800.00, "收款银行": "中国工商银行上海浦东支行", "收款账号": "1001 2345 6789 0123 456", "备注": "合同约定分期付款", "附件张数": 5, "出纳专用": "已付款", "填报人": "李四" },
+                { "报销单号": "FK-2025-002", "所属部门": "销售部", "收款单位": "张三", "付款说明": "差旅费报销", "填报日期": "2025-01-16", "合同号": "", "付款日期": "2025-01-16", "付款方式": "对私转账", "金额": 3250.00, "收款银行": "中国建设银行北京海淀支行", "收款账号": "6227 0000 1234 5678 901", "备注": "出差深圳3天", "附件张数": 8, "出纳专用": "", "填报人": "王五" },
+                { "报销单号": "FK-2025-003", "所属部门": "市场部", "收款单位": "北京XX广告有限公司", "付款说明": "品牌推广服务费", "填报日期": "2025-01-17", "合同号": "HT-2025-003", "付款日期": "2025-01-17", "付款方式": "对公转账", "金额": 28000.00, "收款银行": "招商银行北京朝阳支行", "收款账号": "1109 0123 4567 8901 234", "备注": "Q1季度推广费用", "附件张数": 3, "出纳专用": "待审核", "填报人": "赵六" }
+            ];
+            报销数据 = 当前使用者 ? 全量数据.filter(function(item) { return item['填报人'] === 当前使用者.name; }) : 全量数据.slice();
+            if (报销数据.length === 0 && 当前使用者) 报销数据 = 全量数据.slice();
+            updateTable();
+            showDataStatus('✅ 已加载 ' + 报销数据.length + ' 条示例数据（' + (当前使用者 ? '已筛选：' + 当前使用者.name : '全部') + '）');
+        }
+
+        function filterData() {
+            var search = document.getElementById('searchInput').value.toLowerCase();
+            var billNoStart = document.getElementById('billNoFilter').value.trim().toUpperCase();
+            报销数据 = 全量数据.filter(function(item) {
+                var matchSearch = !search ||
+                    String(item['报销单号'] || '').toLowerCase().indexOf(search) > -1 ||
+                    String(item['所属部门'] || '').toLowerCase().indexOf(search) > -1 ||
+                    String(item['收款单位'] || '').toLowerCase().indexOf(search) > -1;
+                var matchBillNo = true;
+                if (billNoStart) {
+                    var itemBillNo = String(item['报销单号'] || '').toUpperCase();
+                    matchBillNo = itemBillNo >= billNoStart;
+                }
+                return matchSearch && matchBillNo;
+            });
+            updateTable();
+        }
+
+        function updateTable(data) {
+            var displayData = data || 报销数据;
+            var tbody = document.getElementById('tableBody');
+            if (displayData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="14" style="text-align: center; padding: 40px; color: #999;">暂无数据</td></tr>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < displayData.length; i++) {
+                var item = displayData[i];
+                var billNo = String(item['报销单号'] || '');
+                var isSelected = 选中的单号.indexOf(billNo) > -1;
+                html += '<tr class="' + (isSelected ? ' selected' : '') + '">';
+                html += '<td style="text-align: center;"><div class="custom-checkbox' + (isSelected ? ' checked' : '') + '" data-billno="' + billNo + '" onclick="toggleSelect(this)"></div></td>';
+                html += '<td>' + (item['所属部门'] || '') + '</td>';
+                html += '<td>' + (item['收款单位'] || '') + '</td>';
+                html += '<td>' + (item['付款说明'] || '') + '</td>';
+                html += '<td>' + (item['填报日期'] || '') + '</td>';
+                html += '<td>' + (item['合同号'] || '') + '</td>';
+                html += '<td>' + (item['付款日期'] || '') + '</td>';
+                html += '<td>' + (item['付款方式'] || '') + '</td>';
+                html += '<td>' + (item['收款银行'] || '') + '</td>';
+                html += '<td>' + (item['收款账号'] || '') + '</td>';
+                html += '<td>' + (item['备注'] || '') + '</td>';
+                html += '<td style="color: #f5222d; font-weight: 600;">¥' + formatAmount(item['金额']) + '</td>';
+                html += '<td>' + (item['出纳专用'] || '') + '</td>';
+                html += '<td>' + (item['填报人'] || '') + '</td>';
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
+            updateSelectAllCheckbox();
+        }
+
+        function formatAmount(amount) {
+            return Number(amount || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function getAutoFitStyle(text, maxWidth, maxFontSize) {
+            maxFontSize = maxFontSize || 11;
+            var minFontSize = 7;
+            var textLength = text ? text.length : 0;
+            var limit = maxWidth === 'wide' ? 80 : (maxWidth === 'narrow' ? 12 : 18);
+            if (textLength <= limit) return 'font-size: ' + maxFontSize + 'pt;';
+            else if (textLength <= limit * 2) return 'font-size: ' + Math.max(minFontSize, maxFontSize - 1) + 'pt;';
+            else if (textLength <= limit * 3) return 'font-size: ' + Math.max(minFontSize, maxFontSize - 2) + 'pt;';
+            else return 'font-size: ' + Math.max(minFontSize, maxFontSize - 3) + 'pt;';
+        }
+
+        function fitCell(text, colspan, rowspan, height) {
+            var style = getAutoFitStyle(text);
+            var extraStyle = height ? ' height: ' + height + 'px;' : '';
+            var colAttr = colspan ? ' colspan="' + colspan + '"' : '';
+            var rowAttr = rowspan ? ' rowspan="' + rowspan + '"' : '';
+            return '<td' + colAttr + rowAttr + ' class="auto-fit-cell" style="' + style + extraStyle + '">' + (text || '') + '</td>';
+        }
+
+        function amountToChinese(amount) {
+            var digits = ['零','壹','贰','叁','肆','伍','陆','柒','捌','玖'];
+            var units = ['分','角','元','拾','佰','仟','万','拾','佰','仟','亿'];
+            var result = '';
+            var amountStr = Math.round(amount * 100).toString();
+            for (var i = 0; i < amountStr.length; i++) {
+                result += digits[parseInt(amountStr[i])] + units[amountStr.length - 1 - i];
+            }
+            result = result.replace(/零[拾佰仟角]/g, '零').replace(/零+/g, '零');
+            result = result.replace(/零元/g, '元').replace(/零角/g, '').replace(/零分/g, '');
+            if (result === '') result = '零元整';
+            else if (!result.endsWith('整') && !result.endsWith('角') && !result.endsWith('分')) result += '整';
+            return result;
+        }
+
+        function toggleSelectAll() {
+            var isChecked = document.getElementById('selectAll').classList.contains('checked');
+            选中的单号 = isChecked ? [] : 报销数据.map(function(item) { return String(item['报销单号'] || ''); });
+            updateTable();
+            updateSelectedCount();
+        }
+        function toggleSelect(element) {
+            var billNo = String(element.getAttribute('data-billno'));
+            var index = 选中的单号.indexOf(billNo);
+            if (index > -1) 选中的单号.splice(index, 1);
+            else 选中的单号.push(billNo);
+            updateTable();
+            updateSelectedCount();
+        }
+        function updateSelectAllCheckbox() {
+            var checkbox = document.getElementById('selectAll');
+            if (选中的单号.length === 报销数据.length && 报销数据.length > 0) checkbox.classList.add('checked');
+            else checkbox.classList.remove('checked');
+        }
+        function updateSelectedCount() {
+            document.getElementById('selectedCountBtn').textContent = 选中的单号.length;
+        }
+        function closePrintModal() { document.getElementById('printModal').classList.remove('active'); }
+        function printSelected() {
+            if (选中的单号.length === 0) { alert('请先勾选要打印的单据'); return; }
+            当前打印模式 = 'a5';
+            generatePrintPages();
+            document.getElementById('selectedCount').textContent = 选中的单号.length;
+            document.getElementById('printModal').classList.add('active');
+        }
+        function printSelectedA4() {
+            if (选中的单号.length === 0) { alert('请先勾选要打印的单据'); return; }
+            当前打印模式 = 'a4';
+            generatePrintPages();
+            document.getElementById('selectedCount').textContent = 选中的单号.length;
+            document.getElementById('printModal').classList.add('active');
+        }
+
+        function generatePrintPages() {
+            var container = document.getElementById('printContainer');
+            var html = '';
+            for (var i = 0; i < 选中的单号.length; i++) {
+                var billNo = String(选中的单号[i]);
+                var data = null;
+                for (var j = 0; j < 报销数据.length; j++) {
+                    if (String(报销数据[j]['报销单号'] || '') === billNo) { data = 报销数据[j]; break; }
+                }
+                if (!data) continue;
+                var amountParts = getAmountParts(data['金额']);
+                var paymentMethods = ['现金', '对公转账', '对私转账', '其他'];
+                var fs = getAutoFitStyle;
+                html += '<div class="print-template">';
+                html += '<div class="print-title">付 款 审 批 单</div>';
+                html += '<div class="print-header-row">';
+                html += '<span>付款单位：' + (data['所属部门'] || '') + '</span>';
+                html += '<span style="margin-right:10mm">填报日期：' + formatDateCN(data['填报日期'] || '') + '</span>';
+                html += '</div>';
+                html += '<table class="print-main-table">';
+                html += '<colgroup><col style="width:25mm"><col style="width:87mm"><col style="width:21mm"><col style="width:50mm"></colgroup>';
+                html += '<tr><th style="height:8mm">收款单位</th><td class="auto-fit-cell" style="' + fs(data['收款单位'], 'wide') + 'height:8mm">' + (data['收款单位'] || '') + '</td><th style="height:8mm">合同号</th><td style="height:8mm">' + (data['报销单号'] || '') + '</td></tr>';
+                html += '<tr><th rowspan="2" style="height:20mm">付款说明</th><td rowspan="2" class="auto-fit-cell" style="' + fs(data['付款说明'], 'wide') + 'height:20mm">' + (data['付款说明'] || '') + '</td><th style="height:10mm">付款日期</th><td style="height:10mm">' + formatDateCN(data['付款日期'] || '') + '</td></tr>';
+                html += '<tr><th style="height:10mm">附件张数</th><td style="height:10mm;position:relative">' + (data['附件张数'] || 0) + ' 张<span style="position:absolute;left:22mm;top:50%;transform:translateY(-50%);font-size:10pt">' + (data['出纳专用'] || '') + '</span></td></tr>';
+                html += '<tr><th style="height:10mm">付款方式</th><td colspan="3" style="height:10mm"><div class="checkbox-group">';
+                for (var m = 0; m < paymentMethods.length; m++) {
+                    var method = paymentMethods[m];
+                    var checked = data['付款方式'] === method ? ' checked' : '';
+                    html += '<div class="checkbox-item"><span class="checkbox' + checked + '"></span>' + method + '</div>';
+                }
+                html += '</div></td></tr>';
+                html += '<tr><th style="height:10mm">收款银行</th><td class="auto-fit-cell" style="' + fs(data['收款银行'], 'wide') + 'height:10mm">' + (data['收款银行'] || '') + '</td><th style="height:10mm">收款账号</th><td class="auto-fit-cell" style="' + fs(data['收款账号'], 'wide') + 'height:10mm">' + (data['收款账号'] || '') + '</td></tr>';
+                html += '<tr><th style="height:18mm">备 注</th><td colspan="3" class="auto-fit-cell" style="' + fs(data['备注'], 'wide') + 'height:18mm">' + (data['备注'] || '') + '</td></tr>';
+                html += '<tr><th style="height:14mm">付款金额</th><td colspan="2" class="auto-fit-cell" style="height:14mm;font-size:11pt">（大写）' + amountToChinese(data['金额'] || 0) + '</td>';
+                html += '<td style="height:14mm;padding:0"><div class="amount-label-grid">';
+                var labels = ['百', '十', '万', '千', '百', '十', '元', '角', '分'];
+                for (var l = 0; l < labels.length; l++) html += '<div class="amount-label-cell">' + labels[l] + '</div>';
+                html += '</div><div class="amount-grid">';
+                for (var a = 0; a < amountParts.length; a++) html += '<div class="amount-grid-cell">' + amountParts[a] + '</div>';
+                html += '</div></td></tr>';
+                html += '<tr><td colspan="4" style="height:22mm;padding:0"><div class="approval-row">';
+                html += '<div class="approval-cell"><div class="label">审批人意见</div></div>';
+                html += '<div class="approval-cell"><div class="label">财务审核</div></div>';
+                html += '<div class="approval-cell"><div class="label">部门复核</div></div>';
+                html += '<div class="approval-cell" style="position:relative"><div class="label">申请人（签字）</div>' + (data['填报人'] ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11pt">' + data['填报人'] + '</div>' : '') + '</div>';
+                html += '</div></td></tr>';
+                html += '</table>';
+                html += '<div class="print-footer-row"><span>验证人：__________</span><span style="margin-right:20mm">付款人：__________</span></div>';
+                html += '<div class="print-user-label">打印：' + (当前使用者 ? 当前使用者.name : '') + '</div>';
+                html += '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function formatDateCN(dateStr) {
+            if (!dateStr) return '____年__月__日';
+            var parts = String(dateStr).split('-');
+            if (parts.length === 3) {
+                var y = (parts[0] || '').padStart(4, '_');
+                var m = (parts[1] || '').padStart(2, '_');
+                var d = (parts[2] || '').padStart(2, '_');
+                return y + '年' + m + '月' + d + '日';
+            }
+            return dateStr;
+        }
+
+        function getAmountParts(amount) {
+            var amountStr = Math.round((amount || 0) * 100).toString();
+            while (amountStr.length < 9) amountStr = '0' + amountStr;
+            var parts = amountStr.split('');
+            var firstNonZero = -1;
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i] !== '0') { firstNonZero = i; break; }
+            }
+            if (firstNonZero > 0) {
+                for (var i = 0; i < firstNonZero - 1; i++) parts[i] = '';
+                parts[firstNonZero - 1] = '￥';
+            }
+            return parts;
+        }
+
+        function doPrint() {
+            if (选中的单号.length === 0) { alert('请先勾选要打印的单据'); return; }
+            if (!当前使用者) { alert('请先登录后再打印'); return; }
+            var printContainer = document.getElementById('printContainer');
+            var printRoot = document.getElementById('printRoot');
+            printRoot.innerHTML = printContainer.innerHTML;
+            var pageStyle = document.createElement('style');
+            pageStyle.id = 'dynamicPrintStyle';
+            if (当前打印模式 === 'a4') {
+                pageStyle.textContent = '@page { size: A4 portrait; margin: 0; }';
+            } else {
+                pageStyle.textContent = '@page { size: 210mm 148mm; margin: 0; }';
+            }
+            document.head.appendChild(pageStyle);
+            window.print();
+            setTimeout(function() {
+                var s = document.getElementById('dynamicPrintStyle');
+                if (s) s.remove();
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
